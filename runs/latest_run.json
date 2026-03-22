@@ -1,0 +1,43 @@
+{
+  "task": "Design an onboarding automation agent and include rollout risks",
+  "events": [
+    {
+      "type": "plan",
+      "payload": {
+        "plan": {
+          "intent": "Deliver a practical answer.",
+          "research_needed": true,
+          "research_queries": [
+            "Design an onboarding automation agent and include rollout risks"
+          ],
+          "output_shape": [
+            "Summary",
+            "Action Plan",
+            "Risks"
+          ]
+        }
+      }
+    },
+    {
+      "type": "tool_result",
+      "payload": {
+        "tool": "web_search",
+        "input": "Design an onboarding automation agent and include rollout risks",
+        "result": "{\"query\": \"Design an onboarding automation agent and include rollout risks\", \"results\": []}"
+      }
+    },
+    {
+      "type": "draft",
+      "payload": {
+        "answer": "Objective: Deliver a practical answer.\n\nTask: Design an onboarding automation agent and include rollout risks\n\n1) Summary\nFocus on a narrow high-impact workflow, define one measurable success metric, and ship a complete path from input to verified output.\n\n2) Action Plan\nBuild in this order: planner, tool execution layer, output verifier, and demo script. Keep each step observable with logs and checkpoints.\n\n3) Risks\nMain risks are provider outages, tool noise, and vague prompts. Mitigate with fallback providers, source filtering, and strict output schemas.\n\n4) Metrics\nTrack latency, task success rate, and recovery rate after tool/provider failures. Improve one metric each iteration.\n\nNote: external model providers are currently rate-limited, so this response used local deterministic fallback logic."
+      }
+    },
+    {
+      "type": "timing",
+      "payload": {
+        "elapsed_ms": 4895,
+        "mode": "fast"
+      }
+    }
+  ]
+}

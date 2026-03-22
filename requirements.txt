@@ -1,0 +1,4 @@
+openai>=1.55.0
+python-dotenv>=1.0.1
+pydantic>=2.10.0
+rich>=13.9.4

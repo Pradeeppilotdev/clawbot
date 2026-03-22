@@ -1,0 +1,19 @@
+{
+  "id": "clawbot",
+  "name": "Clawbot",
+  "version": "0.1.0",
+  "type": "python-agent",
+  "entrypoint": "src/clawbot/multiagent.py:ClawbotAdapter",
+  "description": "Fast planner-research-writer agent with failover, local data tools, and scorecard support.",
+  "capabilities": [
+    "task-planning",
+    "web-research",
+    "file-analysis",
+    "csv-profiling",
+    "fallback-reasoning"
+  ],
+  "runtime": {
+    "python": ">=3.11",
+    "install": "pip install -r requirements.txt"
+  }
+}
