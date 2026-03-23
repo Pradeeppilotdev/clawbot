@@ -21,21 +21,71 @@ class LLMClient(Protocol):
 class OpenAIClient:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
-        self._client = OpenAI(api_key=settings.openai_api_key)
+        client_kwargs: dict[str, Any] = {"api_key": settings.openai_api_key}
+        base_url = settings.openai_base_url.strip()
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        self._client = OpenAI(**client_kwargs)
 
     def complete(self, system_prompt: str, user_prompt: str) -> str:
-        try:
-            resp = self._client.responses.create(
-                model=self._settings.openai_model,
-                temperature=self._settings.temperature,
-                input=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-            )
-            return resp.output_text
-        except Exception as exc:
-            return f"LLM_PROVIDER_ERROR: OpenAI request failed: {exc}"
+        models = _build_model_candidates(
+            self._settings.openai_model,
+            self._settings.openai_fallback_models,
+        )
+        errors: list[str] = []
+
+        for model in models:
+            try:
+                if self._is_openrouter_base_url():
+                    output_text = self._complete_chat(model, system_prompt, user_prompt)
+                else:
+                    resp = self._client.responses.create(
+                        model=model,
+                        temperature=self._settings.temperature,
+                        input=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                    )
+                    output_text = (resp.output_text or "").strip()
+                if output_text:
+                    return output_text
+                errors.append(f"model={model}: empty output")
+            except Exception as exc:
+                msg = str(exc)
+                errors.append(f"model={model}: {msg}")
+
+                # Auth errors won't improve with model fallback.
+                lower = msg.lower()
+                if "unauthorized" in lower or "invalid api key" in lower or "incorrect api key" in lower:
+                    break
+
+        details = " | ".join(errors[-2:]) if errors else "no provider details"
+        return f"LLM_PROVIDER_ERROR: OpenAI request failed after model fallback: {details}"
+
+    def _is_openrouter_base_url(self) -> bool:
+        return "openrouter.ai" in self._settings.openai_base_url.lower()
+
+    def _complete_chat(self, model: str, system_prompt: str, user_prompt: str) -> str:
+        resp = self._client.chat.completions.create(
+            model=model,
+            temperature=self._settings.temperature,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        choices = getattr(resp, "choices", None) or []
+        if not choices:
+            return ""
+        first = choices[0]
+        message = getattr(first, "message", None)
+        if message is None:
+            return ""
+        content = getattr(message, "content", "")
+        if isinstance(content, str):
+            return content.strip()
+        return str(content).strip()
 
 
 class GeminiClient:
@@ -140,21 +190,30 @@ class MockClient:
 
         # Provide deterministic JSON actions to keep the loop testable offline.
         if "Return valid JSON" in user_prompt:
-            if "tool_result" in user_prompt:
-                return json.dumps(
-                    {
-                        "type": "final",
-                        "content": "I completed the task using available context and generated a concise answer.",
-                    }
-                )
             return json.dumps(
                 {
-                    "type": "final",
-                    "content": "Mock mode: Provide OPENAI_API_KEY or GEMINI_API_KEY in .env for full reasoning and tool use.",
+                    "intent": "Deliver a practical answer.",
+                    "research_needed": False,
+                    "research_queries": [],
+                    "output_shape": ["Summary", "Action Plan", "Risks", "Metrics"],
                 }
             )
 
-        return "Mock response"
+        return json.dumps(
+            {
+                "type": "final",
+                "content": (
+                    "Summary: Mock mode is active, so this answer uses deterministic local logic.\n\n"
+                    "Action Plan:\n"
+                    "1. Define a narrow user workflow and one measurable KPI.\n"
+                    "2. Build planner -> tool call -> verifier with visible logs.\n"
+                    "3. Add one fallback path for provider/tool failures and demo it live.\n\n"
+                    "Risks: Weak prompts, tool noise, and missing retries reduce trust.\n"
+                    "Metrics: Track task success, latency, and recovery after induced failure.\n\n"
+                    "Set OPENAI_API_KEY or GEMINI_API_KEY in .env for full model-backed reasoning."
+                ),
+            }
+        )
 
 
 @dataclass
@@ -209,7 +268,16 @@ class FailoverClient:
         errors: list[str] = []
         candidates = self._healthy_clients()
         if not candidates:
-            candidates = self._clients
+            return json.dumps(
+                {
+                    "type": "final",
+                    "content": (
+                        "All configured LLM providers are temporarily unavailable. "
+                        "Circuit breaker is open for every provider; skipping immediate retries. "
+                        f"State: {self._breaker_snapshot()}"
+                    ),
+                }
+            )
 
         for named in candidates:
             result = named.client.complete(system_prompt, user_prompt)
@@ -309,6 +377,10 @@ def _is_provider_error(text: str) -> bool:
 
 
 def _build_gemini_model_candidates(primary: str, fallback_csv: str) -> list[str]:
+    return _build_model_candidates(primary, fallback_csv)
+
+
+def _build_model_candidates(primary: str, fallback_csv: str) -> list[str]:
     models: list[str] = []
     for model in [primary, *fallback_csv.split(",")]:
         cleaned = model.strip()

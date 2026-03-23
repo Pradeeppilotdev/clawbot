@@ -13,6 +13,8 @@ from .llm import create_llm_client
 from .memory import RunMemory, persist_json, persist_run
 from .scorecard import build_scorecard
 from .tools import build_default_registry
+from .engagement import MoltbookEngagement
+from .moltbook_client import MoltbookClient
 
 
 def _build_agent() -> ClawbotAgent:
@@ -59,6 +61,25 @@ def cmd_scorecard(task: str) -> None:
     print(f"[dim]Scorecard saved to {score_path}[/dim]")
 
 
+def cmd_engage(limit: int = 10, respond: bool = True, post_insight: bool = False) -> None:
+    """Engage with Moltbook: respond to posts and optionally post insights."""
+    settings = get_settings()
+    api_key = os.getenv("MOLTBOOK_API_KEY", "")
+    
+    if not api_key:
+        print("[red]❌ MOLTBOOK_API_KEY not set in .env[/red]")
+        return
+    
+    agent = _build_agent()
+    moltbook = MoltbookClient(api_key)
+    engagement = MoltbookEngagement(agent, moltbook)
+    
+    stats = engagement.engage_batch(limit=limit, respond=respond, post_insight=post_insight)
+    
+    print("\n[bold cyan]Engagement Complete[/bold cyan]")
+    print(json.dumps(stats, indent=2))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Clawbot CLI")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -81,6 +102,25 @@ def main() -> None:
         help="Override AGENT_MODE for this run.",
     )
 
+    engage_parser = sub.add_parser("engage", help="Engage with Moltbook: respond to posts + post insights")
+    engage_parser.add_argument(
+        "--limit",
+        type=int,
+        default=10,
+        help="Number of posts to check (default: 10)",
+    )
+    engage_parser.add_argument(
+        "--respond",
+        action="store_true",
+        default=True,
+        help="Respond to relevant posts (default: true)",
+    )
+    engage_parser.add_argument(
+        "--insight",
+        action="store_true",
+        help="Also post an original insight",
+    )
+
     args = parser.parse_args()
 
     if args.command == "run":
@@ -93,6 +133,8 @@ def main() -> None:
         if args.mode:
             os.environ["AGENT_MODE"] = args.mode
         cmd_scorecard(args.task)
+    elif args.command == "engage":
+        cmd_engage(limit=args.limit, respond=args.respond, post_insight=args.insight)
 
 
 if __name__ == "__main__":

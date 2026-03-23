@@ -48,6 +48,16 @@ OPENAI_API_KEY=your_key_here
 OPENAI_MODEL=gpt-4.1-mini
 ```
 
+OpenRouter + Nemotron example:
+
+```bash
+LLM_PROVIDER=openai
+OPENAI_API_KEY=your_openrouter_key_here
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+OPENAI_MODEL=nvidia/llama-3.1-nemotron-70b-instruct
+OPENAI_FALLBACK_MODELS=meta-llama/llama-3.3-70b-instruct
+```
+
 Optional resilience + speed tuning:
 
 ```bash

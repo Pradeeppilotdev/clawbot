@@ -1,15 +1,15 @@
 {
   "task_success": 100,
-  "latency_score": 92,
+  "latency_score": 65,
   "recovery_score": 90,
-  "overall_score": 96,
+  "overall_score": 88,
   "details": {
-    "task": "Design an onboarding automation agent and include rollout risks",
+    "task": "Design an onboarding automation agent",
     "mode": "fast",
-    "elapsed_ms": 4895,
-    "steps_used": 2,
-    "events_count": 4,
+    "elapsed_ms": 10639,
+    "steps_used": 1,
+    "events_count": 3,
     "has_sources": false,
-    "has_numbered_plan": false
+    "has_numbered_plan": true
   }
 }

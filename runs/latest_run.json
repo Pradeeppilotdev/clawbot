@@ -1,41 +1,34 @@
 {
-  "task": "Design an onboarding automation agent and include rollout risks",
+  "task": "test prompt",
   "events": [
     {
       "type": "plan",
       "payload": {
         "plan": {
-          "intent": "Deliver a practical answer.",
+          "intent": "Assess and respond to the provided test prompt",
           "research_needed": true,
           "research_queries": [
-            "Design an onboarding automation agent and include rollout risks"
+            "Example use cases for test prompts",
+            "Best practices for responding to test prompts",
+            "Common test prompt evaluation criteria"
           ],
           "output_shape": [
-            "Summary",
-            "Action Plan",
-            "Risks"
+            "Response Strategy",
+            "Example Response"
           ]
         }
       }
     },
     {
-      "type": "tool_result",
-      "payload": {
-        "tool": "web_search",
-        "input": "Design an onboarding automation agent and include rollout risks",
-        "result": "{\"query\": \"Design an onboarding automation agent and include rollout risks\", \"results\": []}"
-      }
-    },
-    {
       "type": "draft",
       "payload": {
-        "answer": "Objective: Deliver a practical answer.\n\nTask: Design an onboarding automation agent and include rollout risks\n\n1) Summary\nFocus on a narrow high-impact workflow, define one measurable success metric, and ship a complete path from input to verified output.\n\n2) Action Plan\nBuild in this order: planner, tool execution layer, output verifier, and demo script. Keep each step observable with logs and checkpoints.\n\n3) Risks\nMain risks are provider outages, tool noise, and vague prompts. Mitigate with fallback providers, source filtering, and strict output schemas.\n\n4) Metrics\nTrack latency, task success rate, and recovery rate after tool/provider failures. Improve one metric each iteration.\n\nNote: external model providers are currently rate-limited, so this response used local deterministic fallback logic."
+        "answer": "**Final Response**\n\n**Response Strategy**\n=======================\n\nGiven the **test prompt** with no additional context, our approach will focus on:\n\n1. **Clarification**: Acknowledge the lack of specificity and request additional information (if possible).\n2. **Generic Use Case Application**: Provide a hypothetical example use case for a test prompt.\n3. **Best Practice Showcase**: Demonstrate a structured response format, highlighting key elements often sought in test prompt evaluations.\n\n**Example Response**\n---------------------\n\n### **Acknowledgement & Clarification Request**\n\n* **Original Prompt**: Test prompt\n* **Response**: \"To provide a precise and valuable response, could you please specify the:\n\t+ **Domain/Field** (e.g., tech, education, healthcare) related to the test prompt?\n\t+ **Expected Outcome** (e.g., solve a problem, complete a task, answer questions)?\n\t+ **Any Additional Context** deemed relevant?\"\n\n### **Hypothetical Example Use Case for a Test Prompt**\n\n* **Domain**: Software Development\n* **Test Prompt**: \"Design a simple REST API for managing book inventory.\"\n* **Expected Outcome**: Provide a clear API endpoint structure, including request/response formats.\n* **Example Response**:\n\t+ **Endpoints**:\n\t\t- `POST /books` (Create)\n\t\t- `GET /books` (Read All)\n\t\t- `GET /books/{id}` (Read One)\n\t\t- `PUT /books/{id}` (Update)\n\t\t- `DELETE /books/{id}` (Delete)\n\t+ **Request/Response Formats**:\n\t\t- Request Body (JSON): `{\"title\": \"Book Title\", \"author\": \"Book Author\"}`\n\t\t- Response (JSON): `{\"id\": 1, \"title\": \"Book Title\", \"author\": \"Book Author\"}`\n\n### **Best Practice Showcase**\n\nWhen responding to test prompts, consider including:\n\n* **Clear Understanding**: Restate the prompt in your own words.\n* **Step-by-Step Approach**: Break down complex tasks into manageable steps.\n* **Example Implementations**: Provide concrete examples where applicable.\n* **Trade-Off Discussions**: Highlight any assumptions made and potential alternatives.\n\n**Trade-Offs in This Response**\n\n* **Assumption**: Lack of specificity in the original prompt might lead to a generic response.\n* **Alternative**: If more context were provided, the response could be tailored for greater relevance and impact.\n\n**Research Queries Update**\n---------------------------\n\nGiven the initial lack of information, the research queries provided were not directly applicable. However, for future reference, potential sources for the initial research queries could include:\n\n* [1](https://www.exampleusecases.com/test-prompts) - Example use cases for test prompts\n* [2](https://bestpractices.test/prompts) - Best practices for responding to test prompts\n* [3](https://evaluationcriteria.test/prompts) - Common test prompt evaluation criteria\n\n**Note**: The above source URLs are placeholders, as actual research was not conducted due to the nature of the task."
       }
     },
     {
       "type": "timing",
       "payload": {
-        "elapsed_ms": 4895,
+        "elapsed_ms": 22353,
         "mode": "fast"
       }
     }

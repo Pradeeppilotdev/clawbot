@@ -154,8 +154,8 @@ class ClawbotAgent:
         if "intent" not in plan:
             return {
                 "intent": "Deliver a practical answer.",
-                "research_needed": True,
-                "research_queries": [task],
+                "research_needed": False,
+                "research_queries": [],
                 "output_shape": ["Summary", "Action Plan", "Risks"],
             }
         return plan
@@ -361,16 +361,16 @@ class ClawbotAgent:
             "",
             f"Task: {task}",
             "",
-            f"1) {shape[0]}",
+            f"1. {shape[0]}",
             "Focus on a narrow high-impact workflow, define one measurable success metric, and ship a complete path from input to verified output.",
             "",
-            f"2) {shape[1] if len(shape) > 1 else 'Execution'}",
+            f"2. {shape[1] if len(shape) > 1 else 'Execution'}",
             "Build in this order: planner, tool execution layer, output verifier, and demo script. Keep each step observable with logs and checkpoints.",
             "",
-            f"3) {shape[2] if len(shape) > 2 else 'Risks'}",
+            f"3. {shape[2] if len(shape) > 2 else 'Risks'}",
             "Main risks are provider outages, tool noise, and vague prompts. Mitigate with fallback providers, source filtering, and strict output schemas.",
             "",
-            f"4) {shape[3] if len(shape) > 3 else 'Metrics'}",
+            f"4. {shape[3] if len(shape) > 3 else 'Metrics'}",
             "Track latency, task success rate, and recovery rate after tool/provider failures. Improve one metric each iteration.",
         ]
 

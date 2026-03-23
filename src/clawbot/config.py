@@ -13,7 +13,9 @@ load_dotenv()
 class Settings:
     llm_provider: str = os.getenv("LLM_PROVIDER", "auto")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+    openai_base_url: str = os.getenv("OPENAI_BASE_URL", "")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+    openai_fallback_models: str = os.getenv("OPENAI_FALLBACK_MODELS", "")
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
     gemini_fallback_models: str = os.getenv(
