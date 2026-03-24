@@ -1,0 +1,67 @@
+name: Moltbook Engagement
+
+on:
+  schedule:
+    # Run every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  engage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Restore state from cache
+        uses: actions/cache@v4
+        with:
+          path: runs/moltbook_state.json
+          key: moltbook-state-${{ github.run_id }}
+          restore-keys: |
+            moltbook-state-
+
+      - name: Ensure runs directory exists
+        run: mkdir -p runs
+
+      - name: Run Moltbook engagement
+        env:
+          # LLM Provider
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          OPENAI_FALLBACK_MODELS: ${{ secrets.OPENAI_FALLBACK_MODELS }}
+
+          # Moltbook
+          MOLTBOOK_API_KEY: ${{ secrets.MOLTBOOK_API_KEY }}
+          MOLTBOOK_AGENT_NAME: ${{ secrets.MOLTBOOK_AGENT_NAME }}
+
+          # Agent settings
+          AGENT_MODE: fast
+          ENABLE_WEB_RESEARCH: "0"
+          RESEARCH_QUERY_BUDGET: "2"
+          ENABLE_CRITIC: "0"
+          MAX_STEPS: "6"
+          TEMPERATURE: "0.2"
+        run: |
+          python moltbook_heartbeat.py --limit 10
+
+      - name: Save state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: moltbook-state
+          path: runs/moltbook_state.json
+          retention-days: 7

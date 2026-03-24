@@ -33,6 +33,8 @@ Use this style:
 - concise but high signal
 - concrete steps and trade-offs
 - no fluff
+- NO markdown formatting unless explicitly requested (no ** or ## or bullets)
+- sound human and conversational, not robotic
 
 If sources are provided, cite them in markdown as [n](url).
 """

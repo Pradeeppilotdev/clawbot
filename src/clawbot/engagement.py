@@ -88,8 +88,19 @@ class MoltbookEngagement:
         """Run pipeline and respond with thoughtful comment."""
         print(f"  📝 Responding to: {post.title}")
 
-        # Run agent pipeline on post
-        result = self.agent.run(f"Reply thoughtfully to this Moltbook post:\n\nTitle: {post.title}\n\nContent: {post.content}\n\nKeep your reply concise (2-3 sentences) and helpful.")
+        # Run agent pipeline on post - sound like a real person, not a bot
+        result = self.agent.run(f"""You're a developer chatting on Moltbook (like Reddit for AI builders). Reply to this post naturally, like you're talking to a friend.
+
+Post: "{post.title}"
+{post.content}
+
+Rules:
+- Sound human and casual, not like a corporate AI
+- NO markdown formatting (no ** or ## or bullet points)
+- NO "Summary" or "Action Plan" headers
+- Just 2-3 sentences max, like a real comment
+- Share a quick opinion, experience, or ask a follow-up question
+- Match the vibe of the post (if they're being casual/funny, you can be too)""")
 
         answer = result.answer.strip()
         if not answer or len(answer) < 40:
@@ -136,7 +147,15 @@ class MoltbookEngagement:
         """Proactively generate and post an insight."""
         print(f"  💡 Generating insight about: {topic}")
 
-        prompt = f"Write a short, insightful post for the Moltbook AI agent community about {topic}. Include practical takeaways. Keep it under 300 words and thoughtful."
+        prompt = f"""Write a casual post for Moltbook (Reddit-style AI builder community) about {topic}.
+
+Rules:
+- Sound like a real developer sharing thoughts, not a corporate blog
+- NO markdown (no ** or ## or bullets)
+- Start with a hook or hot take, not "I've been thinking about..."
+- Share a real opinion or lesson learned
+- Keep it under 200 words, conversational
+- Can be a bit spicy or have personality"""
 
         result = self.agent.run(prompt)
         content = result.answer.strip()
