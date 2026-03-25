@@ -147,32 +147,39 @@ Rules:
         """Proactively generate and post an insight."""
         print(f"  💡 Generating insight about: {topic}")
 
-        prompt = f"""Write a casual post for Moltbook (Reddit-style AI builder community) about {topic}.
+        prompt = f"""Write a post for Moltbook about: {topic}
+
+Format your response EXACTLY like this:
+TITLE: [catchy title under 80 chars]
+CONTENT: [your post content]
 
 Rules:
-- Sound like a real developer sharing thoughts, not a corporate blog
+- The title should be a hook or hot take, not generic
+- Content should be 100-200 words, conversational
+- Sound like a dev sharing real experience, not a corporate blog
 - NO markdown (no ** or ## or bullets)
-- Start with a hook or hot take, not "I've been thinking about..."
-- Share a real opinion or lesson learned
-- Keep it under 200 words, conversational
-- Can be a bit spicy or have personality"""
+- NO preamble like "Here's" or "Sure" - just the TITLE: and CONTENT:
+- Be opinionated, share what actually works"""
 
         result = self.agent.run(prompt)
-        content = result.answer.strip()
+        raw = result.answer.strip()
 
-        if not content or len(content) < 80:
+        if not raw or len(raw) < 80:
             print(f"    ⚠️ Content too short")
             return False
 
-        # Extract title from first line or generate one
-        lines = content.split("\n")
-        title = lines[0][:100] if lines else "Thoughts on AI Agents"
+        # Parse TITLE: and CONTENT: format
+        title, content = self._parse_post_format(raw)
 
-        # Post it
+        if not title or not content:
+            print(f"    ⚠️ Could not parse title/content format")
+            return False
+
+        # Post it - use agents submolt for agent-related content
         post_resp = self.moltbook.create_post(
             title=title,
             content=content,
-            submolt="general",
+            submolt="agents",  # Post to m/agents instead of m/general
         )
 
         if not post_resp:
@@ -204,6 +211,7 @@ Rules:
         stats = {
             "posts_checked": 0,
             "posts_responded": 0,
+            "posts_upvoted": 0,
             "insights_posted": 0,
             "errors": 0,
         }
@@ -213,6 +221,13 @@ Rules:
             posts = self.moltbook.get_feed(limit=limit, sort="hot")
             stats["posts_checked"] = len(posts)
             print(f"  📬 Fetched {len(posts)} posts from feed")
+
+            # Upvote good posts about agents/AI
+            for post in posts[:5]:  # Only check top 5
+                if self._should_upvote(post):
+                    if self.moltbook.upvote_post(post.id):
+                        stats["posts_upvoted"] += 1
+                        print(f"  👍 Upvoted: {post.title[:50]}...")
 
             # Respond to relevant posts
             if respond:
@@ -226,11 +241,16 @@ Rules:
 
             # Optionally post an insight
             if post_insight:
+                # Topics specific to Clawbot's expertise: hackathon agents, failover, tools
                 topics = [
-                    "agent reliability and error handling",
-                    "building effective tool implementations",
-                    "balancing speed vs accuracy in agent design",
-                    "strategies for multi-LLM failover",
+                    "why your hackathon agent needs a fallback LLM provider",
+                    "the planner-research-writer pipeline for fast agent prototypes",
+                    "building a tool registry pattern that actually scales",
+                    "local data tools vs API calls - when to use which",
+                    "scoring agent outputs objectively with scorecards",
+                    "circuit breakers saved my demo - here's how",
+                    "stop overengineering your hackathon agent",
+                    "the 3 tools every hackathon agent actually needs",
                 ]
                 topic = topics[hash(str(__import__("time").time())) % len(topics)]
                 if self.generate_insight(topic):
@@ -242,8 +262,24 @@ Rules:
 
         self._save_state()
 
-        print(f"\n📊 Summary: {stats['posts_responded']} replies, {stats['insights_posted']} insights posted")
+        print(f"\n📊 Summary: {stats['posts_upvoted']} upvotes, {stats['posts_responded']} replies, {stats['insights_posted']} insights")
         return stats
+
+    def _should_upvote(self, post: MoltbookPost) -> bool:
+        """Decide if post deserves an upvote."""
+        # Skip own posts
+        if self.own_agent_name and post.author == self.own_agent_name:
+            return False
+
+        # Skip already engaged posts (we probably already upvoted)
+        if post.id in self.engaged_post_ids:
+            return False
+
+        text = f"{post.title} {post.content}".lower()
+
+        # Upvote posts about agent building, hackathons, tools
+        agent_keywords = ["agent", "llm", "hackathon", "tool", "pipeline", "failover", "prompt"]
+        return any(k in text for k in agent_keywords)
 
     @staticmethod
     def _reply_hash(text: str) -> str:
@@ -262,6 +298,49 @@ Rules:
             "external model providers are currently rate-limited",
         ]
         return any(m in lower for m in markers)
+
+    @staticmethod
+    def _parse_post_format(raw: str) -> tuple[str, str]:
+        """Parse TITLE: and CONTENT: format from LLM output."""
+        title = ""
+        content = ""
+
+        # Try to extract TITLE: and CONTENT:
+        lines = raw.strip().split("\n")
+        in_content = False
+        content_lines = []
+
+        for line in lines:
+            line_stripped = line.strip()
+            if line_stripped.upper().startswith("TITLE:"):
+                title = line_stripped[6:].strip().strip('"').strip("'")
+            elif line_stripped.upper().startswith("CONTENT:"):
+                in_content = True
+                rest = line_stripped[8:].strip()
+                if rest:
+                    content_lines.append(rest)
+            elif in_content:
+                content_lines.append(line)
+
+        content = "\n".join(content_lines).strip()
+
+        # Fallback: if no TITLE:/CONTENT: format, use first line as title
+        if not title and not content:
+            lines = raw.strip().split("\n")
+            # Strip common prefixes
+            first_line = lines[0] if lines else ""
+            for prefix in ["here's", "sure,", "here is", "okay,", "alright,"]:
+                if first_line.lower().startswith(prefix):
+                    first_line = first_line[len(prefix):].strip()
+                    # Also strip "the moltbook post:" etc
+                    for suffix in ["the moltbook post:", "a moltbook post:", "the post:", "a post:"]:
+                        if first_line.lower().startswith(suffix):
+                            first_line = first_line[len(suffix):].strip()
+                    break
+            title = first_line[:100] if first_line else "Quick thought on agent building"
+            content = raw.strip()
+
+        return title, content
 
     @staticmethod
     def _solve_challenge(challenge_text: str) -> str | None:
