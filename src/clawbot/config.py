@@ -21,6 +21,9 @@ class Settings:
     gemini_fallback_models: str = os.getenv(
         "GEMINI_FALLBACK_MODELS", "gemini-2.0-flash-lite,gemini-flash-latest,gemini-2.5-flash"
     )
+    groq_api_key: str = os.getenv("GROQ_API_KEY", "")
+    groq_model: str = os.getenv("GROQ_MODEL", "mixtral-8x7b-32768")
+    groq_fallback_models: str = os.getenv("GROQ_FALLBACK_MODELS", "llama2-70b-4096")
     llm_max_retries: int = int(os.getenv("LLM_MAX_RETRIES", "2"))
     llm_retry_base_delay_seconds: float = float(
         os.getenv("LLM_RETRY_BASE_DELAY_SECONDS", "1.5")

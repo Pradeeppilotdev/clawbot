@@ -80,8 +80,8 @@ def main():
         agent = ClawbotAgent(settings=settings, llm=llm, tools=tools)
         moltbook = MoltbookClient(api_key)
 
-        # Run engagement
-        engagement = MoltbookEngagement(agent, moltbook)
+        # Run engagement with direct LLM for fast replies
+        engagement = MoltbookEngagement(agent, moltbook, llm=llm)
         stats = engagement.engage_batch(
             limit=args.limit,
             respond=True,

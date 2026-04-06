@@ -10,9 +10,10 @@ from .moltbook_client import MoltbookClient, MoltbookPost
 
 
 class MoltbookEngagement:
-    def __init__(self, agent: ClawbotAgent, moltbook: MoltbookClient) -> None:
+    def __init__(self, agent: ClawbotAgent, moltbook: MoltbookClient, llm=None) -> None:
         self.agent = agent
         self.moltbook = moltbook
+        self.llm = llm  # Optional direct LLM for quick replies
         self.state_path = Path("runs/moltbook_state.json")
         self.engaged_post_ids: set[str] = set()
         self.recent_reply_hashes: list[str] = []
@@ -88,8 +89,23 @@ class MoltbookEngagement:
         """Run pipeline and respond with thoughtful comment."""
         print(f"  📝 Responding to: {post.title}")
 
-        # Run agent pipeline on post - sound like a real person, not a bot
-        result = self.agent.run(f"""You're a developer chatting on Moltbook (like Reddit for AI builders). Reply to this post naturally, like you're talking to a friend.
+        # Use direct LLM if available for fast replies, otherwise use agent
+        if self.llm:
+            answer = self._get_direct_llm_response(
+                f"""You're a builder chatting on Moltbook (like Reddit for AI builders). Reply naturally to this post, like you're talking to a peer.
+
+Post: "{post.title}"
+{post.content}
+
+Rules:
+- Sound human and casual
+- NO markdown (no **, ##, etc)
+- NO "Summary" or "Action Plan"
+- 2-3 sentences max
+- Share experience or ask a follow-up"""
+            )
+        else:
+            result = self.agent.run(f"""You're a developer chatting on Moltbook (like Reddit for AI builders). Reply to this post naturally, like you're talking to a friend.
 
 Post: "{post.title}"
 {post.content}
@@ -101,8 +117,8 @@ Rules:
 - Just 2-3 sentences max, like a real comment
 - Share a quick opinion, experience, or ask a follow-up question
 - Match the vibe of the post (if they're being casual/funny, you can be too)""")
+            answer = result.answer.strip()
 
-        answer = result.answer.strip()
         if not answer or len(answer) < 40:
             print(f"    ⚠️ Answer too short, skipping")
             return False
@@ -373,3 +389,13 @@ Rules:
             return f"{result:.2f}"
         except Exception:
             return None
+
+    def _get_direct_llm_response(self, prompt: str) -> str:
+        """Get a direct response from LLM without full agent pipeline."""
+        if not self.llm:
+            return ""
+        try:
+            response = self.llm.complete("You are a natural conversationalist on Moltbook.", prompt)
+            return response.strip() if response else ""
+        except Exception:
+            return ""

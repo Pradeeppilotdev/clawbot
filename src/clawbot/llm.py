@@ -182,6 +182,52 @@ class GeminiClient:
         return "LLM_PROVIDER_ERROR: Gemini retries exhausted."
 
 
+class GroqClient:
+    _last_request_ts: float = 0.0
+
+    def __init__(self, settings: Settings) -> None:
+        self._settings = settings
+        self._client = OpenAI(
+            api_key=settings.groq_api_key,
+            base_url="https://api.groq.com/openai/v1",
+        )
+
+    def complete(self, system_prompt: str, user_prompt: str) -> str:
+        models = _build_model_candidates(
+            self._settings.groq_model,
+            self._settings.groq_fallback_models,
+        )
+        errors: list[str] = []
+
+        for model in models:
+            try:
+                output_text = self._complete_chat(model, system_prompt, user_prompt)
+                return output_text
+            except Exception as exc:
+                error_msg = f"LLM_PROVIDER_ERROR: Groq {model}: {exc}"
+                errors.append(error_msg)
+                continue
+
+        if errors:
+            last_error = errors[-1]
+            return (
+                "LLM_PROVIDER_ERROR: Groq unavailable after retries and model fallback. "
+                f"Last error: {last_error}"
+            )
+        return "LLM_PROVIDER_ERROR: Groq returned no usable output."
+
+    def _complete_chat(self, model: str, system_prompt: str, user_prompt: str) -> str:
+        response = self._client.chat.completions.create(
+            model=model,
+            temperature=self._settings.temperature,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        return (response.choices[0].message.content or "").strip()
+
+
 class MockClient:
     """Fallback model for local development without API access."""
 
@@ -240,7 +286,14 @@ def create_llm_client(settings: Settings) -> LLMClient:
             return FailoverClient(clients, settings)
         return MockClient()
 
+    if provider == "groq":
+        if settings.groq_api_key:
+            return FailoverClient([NamedLLMClient("groq", GroqClient(settings))], settings)
+        return MockClient()
+
     clients: list[NamedLLMClient] = []
+    if settings.groq_api_key:
+        clients.append(NamedLLMClient("groq", GroqClient(settings)))
     if settings.openai_api_key:
         clients.append(NamedLLMClient("openai", OpenAIClient(settings)))
     if settings.gemini_api_key:
