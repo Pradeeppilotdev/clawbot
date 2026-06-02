@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import random
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +19,10 @@ class MoltbookEngagement:
         self.state_path = Path("runs/moltbook_state.json")
         self.engaged_post_ids: set[str] = set()
         self.recent_reply_hashes: list[str] = []
+        self.recent_post_hashes: list[str] = []
+        self.recent_post_titles: list[str] = []
+        self.recent_post_texts: list[str] = []
+        self.recent_post_topics: list[str] = []
         self.own_agent_name = ""
         self._load_state()
         self._load_profile()
@@ -39,6 +45,18 @@ class MoltbookEngagement:
                 hashes = data.get("recent_reply_hashes", [])
                 if isinstance(hashes, list):
                     self.recent_reply_hashes = [str(x) for x in hashes[:30]]
+                post_hashes = data.get("recent_post_hashes", [])
+                if isinstance(post_hashes, list):
+                    self.recent_post_hashes = [str(x) for x in post_hashes[:30]]
+                post_titles = data.get("recent_post_titles", [])
+                if isinstance(post_titles, list):
+                    self.recent_post_titles = [str(x) for x in post_titles[:30]]
+                post_texts = data.get("recent_post_texts", [])
+                if isinstance(post_texts, list):
+                    self.recent_post_texts = [str(x) for x in post_texts[:30]]
+                post_topics = data.get("recent_post_topics", [])
+                if isinstance(post_topics, list):
+                    self.recent_post_topics = [str(x) for x in post_topics[:30]]
         except Exception:
             pass
 
@@ -47,6 +65,10 @@ class MoltbookEngagement:
         payload = {
             "engaged_post_ids": sorted(self.engaged_post_ids),
             "recent_reply_hashes": self.recent_reply_hashes[:30],
+            "recent_post_hashes": self.recent_post_hashes[:30],
+            "recent_post_titles": self.recent_post_titles[:30],
+            "recent_post_texts": self.recent_post_texts[:30],
+            "recent_post_topics": self.recent_post_topics[:30],
         }
         self.state_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
@@ -163,7 +185,40 @@ Rules:
         """Proactively generate and post an insight."""
         print(f"  💡 Generating insight about: {topic}")
 
-        prompt = f"""Write a post for Moltbook about: {topic}
+        topics = [
+            "why your hackathon agent needs a fallback LLM provider",
+            "the planner-research-writer pipeline for fast agent prototypes",
+            "building a tool registry pattern that actually scales",
+            "local data tools vs API calls - when to use which",
+            "scoring agent outputs objectively with scorecards",
+            "circuit breakers saved my demo - here's how",
+            "stop overengineering your hackathon agent",
+            "the 3 tools every hackathon agent actually needs",
+            "prompt hygiene that prevents brittle agent behavior",
+            "how to set up evals that catch regressions early",
+            "designing tool retries without masking real failures",
+            "keeping agent outputs consistent with small style rules",
+            "practical guardrails for autonomous tool use",
+            "what I log in every agent run (and why)",
+            "choosing between local tools and external APIs under time pressure",
+            "how to keep multi-agent workflows from stepping on each other",
+            "the minimum viable dashboard for agent reliability",
+            "when to use deterministic fallbacks vs retries",
+            "shipping a demo that survives flaky dependencies",
+            "finding the smallest usable scope for a hackathon agent",
+            "how I debug an agent that feels 'random'",
+            "trade-offs between speed and accuracy in agent responses",
+        ]
+
+        attempt_limit = 3
+        recent_titles = [t for t in self.recent_post_titles[:8] if t.strip()]
+        recent_topics = [t for t in self.recent_post_topics[:8] if t.strip()]
+        recent_titles_text = "; ".join(recent_titles)
+        recent_topics_text = "; ".join(recent_topics)
+
+        for attempt in range(attempt_limit):
+            chosen_topic = self._choose_insight_topic(topics, fallback=topic)
+            prompt = f"""Write a post for Moltbook about: {chosen_topic}
 
 Format your response EXACTLY like this:
 TITLE: [catchy title under 80 chars]
@@ -175,49 +230,65 @@ Rules:
 - Sound like a dev sharing real experience, not a corporate blog
 - NO markdown (no ** or ## or bullets)
 - NO preamble like "Here's" or "Sure" - just the TITLE: and CONTENT:
-- Be opinionated, share what actually works"""
+- Be opinionated, share what actually works
+- Avoid repeating recent titles or themes
+- Do not reuse these titles: {recent_titles_text or "none"}
+- Do not reuse these themes: {recent_topics_text or "none"}
+- Freshness seed: {time.time():.6f}
+"""
 
-        result = self.agent.run(prompt)
-        raw = result.answer.strip()
+            if attempt > 0:
+                prompt += "Also: pick a different angle than recent posts and avoid reused hooks.\n"
 
-        if not raw or len(raw) < 80:
-            print(f"    ⚠️ Content too short")
-            return False
+            result = self.agent.run(prompt)
+            raw = result.answer.strip()
 
-        # Parse TITLE: and CONTENT: format
-        title, content = self._parse_post_format(raw)
+            if not raw or len(raw) < 80:
+                print(f"    ⚠️ Content too short")
+                continue
 
-        if not title or not content:
-            print(f"    ⚠️ Could not parse title/content format")
-            return False
+            # Parse TITLE: and CONTENT: format
+            title, content = self._parse_post_format(raw)
 
-        # Post it - use agents submolt for agent-related content
-        post_resp = self.moltbook.create_post(
-            title=title,
-            content=content,
-            submolt="agents",  # Post to m/agents instead of m/general
-        )
+            if not title or not content:
+                print(f"    ⚠️ Could not parse title/content format")
+                continue
 
-        if not post_resp:
-            print(f"    ❌ Failed to create post")
-            return False
+            if self._is_duplicate_post(title, content):
+                print(f"    ⚠️ Skipping duplicate-style post")
+                continue
 
-        # Check for verification
-        if post_resp.get("verification"):
-            verification = post_resp["verification"]
-            challenge = verification.get("challenge_text", "")
-            code = verification.get("verification_code", "")
+            # Post it - use agents submolt for agent-related content
+            post_resp = self.moltbook.create_post(
+                title=title,
+                content=content,
+                submolt="agents",  # Post to m/agents instead of m/general
+            )
 
-            challenge_answer = self._solve_challenge(challenge)
-            if challenge_answer:
-                self.moltbook.verify_content(code, challenge_answer)
-                print(f"    ✅ Post published and verified!")
+            if not post_resp:
+                print(f"    ❌ Failed to create post")
+                return False
+
+            # Check for verification
+            if post_resp.get("verification"):
+                verification = post_resp["verification"]
+                challenge = verification.get("challenge_text", "")
+                code = verification.get("verification_code", "")
+
+                challenge_answer = self._solve_challenge(challenge)
+                if challenge_answer:
+                    self.moltbook.verify_content(code, challenge_answer)
+                    print(f"    ✅ Post published and verified!")
+                else:
+                    print(f"    ⚠️ Verification challenge, may be pending")
             else:
-                print(f"    ⚠️ Verification challenge, may be pending")
-        else:
-            print(f"    ✅ Post published!")
+                print(f"    ✅ Post published!")
 
-        return True
+            self._record_recent_post(title, content, chosen_topic)
+            return True
+
+        print(f"    ⚠️ Unable to generate a fresh post after retries")
+        return False
 
     def engage_batch(self, limit: int = 10, respond: bool = True, post_insight: bool = False) -> dict[str, Any]:
         """Run one batch of engagement."""
@@ -237,6 +308,7 @@ Rules:
             posts = self.moltbook.get_feed(limit=limit, sort="hot")
             stats["posts_checked"] = len(posts)
             print(f"  📬 Fetched {len(posts)} posts from feed")
+            self._track_recent_posts_from_feed(posts)
 
             # Upvote good posts about agents/AI
             for post in posts[:5]:  # Only check top 5
@@ -257,19 +329,7 @@ Rules:
 
             # Optionally post an insight
             if post_insight:
-                # Topics specific to Clawbot's expertise: hackathon agents, failover, tools
-                topics = [
-                    "why your hackathon agent needs a fallback LLM provider",
-                    "the planner-research-writer pipeline for fast agent prototypes",
-                    "building a tool registry pattern that actually scales",
-                    "local data tools vs API calls - when to use which",
-                    "scoring agent outputs objectively with scorecards",
-                    "circuit breakers saved my demo - here's how",
-                    "stop overengineering your hackathon agent",
-                    "the 3 tools every hackathon agent actually needs",
-                ]
-                topic = topics[hash(str(__import__("time").time())) % len(topics)]
-                if self.generate_insight(topic):
+                if self.generate_insight():
                     stats["insights_posted"] += 1
 
         except Exception as exc:
@@ -302,6 +362,113 @@ Rules:
         compact = re.sub(r"\s+", " ", text.strip().lower())
         compact = re.sub(r"[^a-z0-9 ]", "", compact)
         return compact[:220]
+
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        compact = re.sub(r"\s+", " ", text.strip().lower())
+        return re.sub(r"[^a-z0-9 ]", "", compact)
+
+    def _post_hash(self, title: str, content: str) -> str:
+        return self._normalize_text(f"{title} {content}")[:260]
+
+    def _tokenize(self, text: str) -> set[str]:
+        tokens = re.findall(r"[a-z0-9]+", text.lower())
+        stop = {
+            "the",
+            "and",
+            "or",
+            "to",
+            "of",
+            "a",
+            "an",
+            "in",
+            "on",
+            "for",
+            "with",
+            "is",
+            "are",
+            "be",
+            "this",
+            "that",
+            "it",
+            "as",
+            "at",
+            "by",
+            "from",
+            "was",
+            "were",
+            "but",
+            "so",
+            "if",
+        }
+        return {t for t in tokens if t not in stop and len(t) > 2}
+
+    def _is_duplicate_post(self, title: str, content: str) -> bool:
+        post_hash = self._post_hash(title, content)
+        if post_hash in self.recent_post_hashes:
+            return True
+
+        title_norm = self._normalize_text(title)
+        recent_title_norms = [self._normalize_text(t) for t in self.recent_post_titles[:20]]
+        if title_norm and title_norm in recent_title_norms:
+            return True
+
+        new_tokens = self._tokenize(f"{title} {content}")
+        if not new_tokens:
+            return False
+
+        for prior in self.recent_post_texts[:20]:
+            prior_tokens = self._tokenize(prior)
+            if not prior_tokens:
+                continue
+            overlap = len(new_tokens & prior_tokens) / max(len(new_tokens), len(prior_tokens))
+            if overlap >= 0.6:
+                return True
+        return False
+
+    def _record_recent_post(self, title: str, content: str, topic: str) -> None:
+        post_hash = self._post_hash(title, content)
+        post_text = self._normalize_text(f"{title} {content}")[:420]
+        title_clean = title.strip()
+        topic_clean = topic.strip()
+
+        if post_hash:
+            if post_hash in self.recent_post_hashes:
+                self.recent_post_hashes.remove(post_hash)
+            self.recent_post_hashes.insert(0, post_hash)
+        if title_clean:
+            if title_clean in self.recent_post_titles:
+                self.recent_post_titles.remove(title_clean)
+            self.recent_post_titles.insert(0, title_clean)
+        if post_text:
+            if post_text in self.recent_post_texts:
+                self.recent_post_texts.remove(post_text)
+            self.recent_post_texts.insert(0, post_text)
+        if topic_clean:
+            if topic_clean in self.recent_post_topics:
+                self.recent_post_topics.remove(topic_clean)
+            self.recent_post_topics.insert(0, topic_clean)
+
+        self.recent_post_hashes = self.recent_post_hashes[:30]
+        self.recent_post_titles = self.recent_post_titles[:30]
+        self.recent_post_texts = self.recent_post_texts[:30]
+        self.recent_post_topics = self.recent_post_topics[:30]
+
+    def _choose_insight_topic(self, topics: list[str], fallback: str) -> str:
+        recent = {t.lower() for t in self.recent_post_topics[:10]}
+        pool = [t for t in topics if t.lower() not in recent]
+        if not pool:
+            pool = list(topics)
+        random.shuffle(pool)
+        return pool[0] if pool else fallback
+
+    def _track_recent_posts_from_feed(self, posts: list[MoltbookPost]) -> None:
+        if not self.own_agent_name:
+            return
+        for post in posts:
+            if post.author != self.own_agent_name:
+                continue
+            self._record_recent_post(post.title, post.content, post.title)
 
     @staticmethod
     def _looks_generic_or_outage(text: str) -> bool:
