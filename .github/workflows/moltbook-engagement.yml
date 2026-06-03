@@ -28,9 +28,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: runs/moltbook_state.json
-          key: moltbook-state-${{ github.run_id }}
+          key: moltbook-state-cache
           restore-keys: |
-            moltbook-state-
+            moltbook-state-cache
 
       - name: Ensure runs directory exists
         run: mkdir -p runs
