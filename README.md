@@ -47,7 +47,7 @@ LLM_PROVIDER=openai
 OPENAI_API_KEY=your_key_here
 OPENAI_MODEL=gpt-4.1-mini
 ```
-
+WORKS WITH GITHUB ACTIONS
 OpenRouter + Nemotron example:
 
 ```bash
